@@ -1,43 +1,35 @@
-import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+
+
 import os
 
-# 示例文件路径
-folder_path = './results/loss_flag1_lr0.0001_dm256_test_DLinear_Load_ftMS_sl96_pl24_p16s8_random2021_0'  # 修改为你的实验名称
+# 设置数据块的大小
+chunk_size = 48  # 可以根据你的数据量和需求调整这个值
 
-# 加载数据
-preds = np.load(os.path.join(folder_path, 'pred.npy'))
-trues = np.load(os.path.join(folder_path, 'true.npy'))
+# 读取CSV文件，使用chunksize分块读取
+filepath = './pre_results/AustraliaNew_data_comparison.csv'  # 替换为你的CSV文件路径
+chunks = pd.read_csv(filepath, parse_dates=[0], chunksize=chunk_size)
 
-# 计算平均值用于绘图
-mean_preds = np.mean(preds, axis=0)
-mean_trues = np.mean(trues, axis=0)
+# 创建一个目录来保存图表
+if not os.path.exists('plots'):
+    os.makedirs('plots')
 
-# 设置图表风格
-plt.style.use('ggplot')
+# 对每个数据块进行迭代
+for i, chunk in enumerate(chunks):
+    # 绘制每个数据块的图表
+    plt.figure(figsize=(10, 6))  # 可以调整图形大小
+    plt.plot(chunk.iloc[:, 0], chunk.iloc[:, 1], label='Actual')
+    plt.plot(chunk.iloc[:, 0], chunk.iloc[:, 2], label='Predicted')
+    plt.legend()
+    plt.title(f'Plot {i + 1}')
+    plt.xlabel('Date Time')
+    plt.ylabel('Value')
 
-# 设置字体大小
-plt.rcParams.update({'font.size': 14})
+    # 保存图表
+    plt.savefig(f'plots/plot_{i + 1}.png')
+    plt.close()  # 关闭图形，以便于生成下一张图表
+    if i > 15:
+        break
 
-# 创建图表
-plt.figure(figsize=(10, 6))
-
-# 绘制预测值和真实值
-plt.plot(mean_trues, label='True Values', color='blue', linewidth=2)
-plt.plot(mean_preds, label='Predicted Values', color='red', linestyle='--', linewidth=2)
-
-# 添加图例和标签
-plt.xlabel('Time Steps', fontsize=16)
-plt.ylabel('Values', fontsize=16)
-plt.title('True vs Predicted Values', fontsize=18)
-plt.legend(fontsize=14)
-plt.grid(True)
-
-# 添加sci论文风格的注释
-plt.tight_layout()
-
-# 保存为PDF
-plt.savefig(os.path.join(folder_path, 'comparison_plot.pdf'), format='pdf')
-
-# 显示图表
-plt.show()
+print('All plots have been saved.')

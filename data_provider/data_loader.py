@@ -287,7 +287,7 @@ class Dataset_Load(Dataset):
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
-        target_time = np.array(pd.to_datetime(self.target_stamp[r_begin:r_end]).astype(int) // 10**9)
+        target_time = np.array(pd.to_datetime(self.target_stamp[r_begin:r_end]).astype('int64') // 10**9)
         return seq_x, seq_y, seq_x_mark, seq_y_mark, target_time
 
     def __len__(self):

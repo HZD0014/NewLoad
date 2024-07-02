@@ -60,12 +60,12 @@ params = {
     'do_predict': False,  # 是否预测未来数据
     'num_workers': 6,  # 数据加载器的工作线程数
     'itr': 2,  # 实验次数
-    'train_epochs': 1,  # 训练周期数
-    'batch_size': 128,  # 训练输入数据的批量大小
-    'patience': 15,  # 早停法的耐心值
+    'train_epochs': 300,  # 训练周期数
+    'batch_size': 512,  # 训练输入数据的批量大小
+    'patience': 30,  # 早停法的耐心值
 
     # 优化器配置
-    'learning_rate': 0.0001,  # 优化器的学习率
+    'learning_rate': 0.00005,  # 优化器的学习率
     'lradj': 'constant',  # 学习率调整策略
     'pct_start': 0.3,  # pct_start 参数
 
@@ -101,11 +101,12 @@ def main():
     if args.is_training:
         for ii in range(args.itr):
             # 设置实验记录
-            setting = 'loss_flag{}_lr{}_dm{}_{}_{}_{}_ft{}_sl{}_pl{}_p{}s{}_random{}_{}'.format(
+            setting = 'loss_flag{}_lr{}_dm{}_{}_data-{}_model{}_{}_ft{}_sl{}_pl{}_p{}_s{}_random{}_{}'.format(
                 args.loss_flag,
                 args.learning_rate,
                 args.d_model,
                 args.model_id,
+                args.data_path.split('.')[0],
                 args.model,
                 args.dataset,
                 args.features,
@@ -116,11 +117,11 @@ def main():
                 args.random_seed, ii)
 
             exp = Exp(args)  # 设置实验
-            print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
-            exp.train(setting)
+            # print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+            # exp.train(setting)
 
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            exp.test(setting)
+            exp.test(setting, test=1)
 
             if args.do_predict:
                 print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

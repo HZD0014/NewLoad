@@ -175,13 +175,12 @@ class Exp_Main(Exp_Basic):
     # 测试模型
     def test(self, setting, test=0):
         test_data, test_loader = self._get_data(flag='test')
-        if test:
+        if test == 1:
             print('加载模型')
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints', setting, 'checkpoint.pth')))
 
         preds, trues, date_stamp_datetimes = [], [], []
-        folder_path = os.path.join('./test_results', setting)
-        os.makedirs(folder_path, exist_ok=True)
+
 
         self.model.eval()
         with torch.no_grad():
@@ -202,7 +201,7 @@ class Exp_Main(Exp_Basic):
                 for row in date_stamp:
                     # 将每一行转换为datetime类型，并添加到列表中
                     t = pd.to_datetime(row, unit='s')
-                    date_stamp_datetimes.extend(t[0])
+                    date_stamp_datetimes.append(t[0])
                 pred, true = outputs.detach().cpu().numpy(), batch_y.detach().cpu().numpy()
                 preds.extend(pred[:, 0])
                 trues.extend(true[:, 0])
@@ -215,20 +214,37 @@ class Exp_Main(Exp_Basic):
             exit()
 
         preds, trues = np.array(preds), np.array(trues)
+        # 假设date_stamp_datetimes, trues, preds是已经定义好的列表或数组
         df = pd.DataFrame({
             'dates': date_stamp_datetimes,
             'trues': trues,
+            # 使用f-string创建新列名
             f'{self.args.model}_preds': preds,
-
         })
 
-        # 保存为CSV文件
-        df.to_csv('./result/data_comparison.csv', index=False)
+        # 确定文件名和路径
+        file_name = f"./pre_results/{self.args.data_path.split('.')[0]}_data_comparison.csv"
 
-        folder_path = os.path.join('./results', setting)
+        # 检查文件是否存在
+        if os.path.isfile(file_name):
+            # 如果文件存在，读取CSV文件
+            existing_df = pd.read_csv(file_name)
+
+            # 检查新列名是否已存在，如果存在则覆盖
+            if f'{self.args.model}_preds' in existing_df.columns:
+                # 直接用新数据覆盖现有列
+                existing_df[f'{self.args.model}_preds'] = df[f'{self.args.model}_preds']
+        else:
+            # 如果文件不存在，使用初始DataFrame
+            existing_df = df
+
+        # 保存DataFrame到CSV文件，不包含索引
+        existing_df.to_csv(file_name, index=False)
+
+        folder_path = os.path.join('./metric_results', setting)
         os.makedirs(folder_path, exist_ok=True)
 
-        mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
+        mae, mse, rmse, mape, mspe, rse = metric(preds, trues)
         # 确保所有指标都是标量
         mae = np.mean(mae) if isinstance(mae, (np.ndarray, list)) else mae
         mse = np.mean(mse) if isinstance(mse, (np.ndarray, list)) else mse
@@ -236,16 +252,15 @@ class Exp_Main(Exp_Basic):
         mape = np.mean(mape) if isinstance(mape, (np.ndarray, list)) else mape
         mspe = np.mean(mspe) if isinstance(mspe, (np.ndarray, list)) else mspe
         rse = np.mean(rse) if isinstance(rse, (np.ndarray, list)) else rse
-        corr = np.mean(corr) if isinstance(corr, (np.ndarray, list)) else corr
+
         print('mse:{}, mae:{}, rse:{}'.format(mse, mae, rse))
         with open("result.txt", 'a') as f:
             f.write(f'{setting}\n')
             f.write('mse:{}, mae:{}, rse:{}\n'.format(mse, mae, rse))
             f.write('\n')
 
-        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe, rse, corr]))
-        np.save(os.path.join(folder_path, f'{self.args.model}_pred.npy'), preds)
-        np.save(os.path.join(folder_path, 'true.npy'), trues)
+        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe, rse]))
+
 
 
     # 预测

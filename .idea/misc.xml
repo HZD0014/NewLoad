@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="VMRNN" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="VMRNN" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="torch1" project-jdk-type="Python SDK" />
 </project>
