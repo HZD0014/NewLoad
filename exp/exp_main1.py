@@ -3,7 +3,7 @@ from exp.exp_basic import Exp_Basic
 from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric, MAE, MSE
-
+import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
@@ -87,7 +87,7 @@ class Exp_Main(Exp_Basic):
         preds, trues = [], []
         self.model.eval()
         with torch.no_grad():
-            for batch_x, batch_y, batch_x_mark, batch_y_mark in vali_loader:
+            for batch_x, batch_y, batch_x_mark, batch_y_mark, date_stamp in vali_loader:
                 batch_x = batch_x.float().to(self.device, non_blocking=True)
                 batch_y = batch_y.float().to(self.device, non_blocking=True)
 
@@ -133,7 +133,7 @@ class Exp_Main(Exp_Basic):
             self.model.train()
             epoch_time = time.time()
 
-            for batch_x, batch_y, batch_x_mark, batch_y_mark in train_loader:
+            for batch_x, batch_y, batch_x_mark, batch_y_mark, date_stamp in train_loader:
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device, non_blocking=True)
                 batch_y = batch_y.float().to(self.device, non_blocking=True)
@@ -179,42 +179,51 @@ class Exp_Main(Exp_Basic):
             print('加载模型')
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints', setting, 'checkpoint.pth')))
 
-        preds, trues, inputx = [], [], []
+        preds, trues, date_stamp_datetimes = [], [], []
         folder_path = os.path.join('./test_results', setting)
         os.makedirs(folder_path, exist_ok=True)
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, date_stamp) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device, non_blocking=True)
                 batch_y = batch_y.float().to(self.device, non_blocking=True)
 
-                outputs = self.model(batch_x) if 'Linear' in self.args.model else self.model(batch_x, batch_x_mark)
+                outputs = self.model(batch_x)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 if f_dim == -1:
                     outputs = outputs.squeeze(-1)
                     batch_y = batch_y[:, -self.args.pred_len:].to(self.device, non_blocking=True)
+                # 初始化一个空列表来存储转换后的datetime对象
 
+
+                # 使用for循环遍历date_stamp的每一行
+                for row in date_stamp:
+                    # 将每一行转换为datetime类型，并添加到列表中
+                    t = pd.to_datetime(row, unit='s')
+                    date_stamp_datetimes.extend(t[0])
                 pred, true = outputs.detach().cpu().numpy(), batch_y.detach().cpu().numpy()
-                preds.append(pred)
-                trues.append(true)
-                inputx.append(batch_x.detach().cpu().numpy())
+                preds.extend(pred[:, 0])
+                trues.extend(true[:, 0])
 
-                if i % 20 == 0:
-                    input = batch_x.detach().cpu().numpy()
-                    gt = np.concatenate((input[0, :, -1], true[0, :]), axis=0)
-                    pd = np.concatenate((input[0, :, -1], pred[0, :]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+
+
 
         if self.args.test_flop:
             test_params_flop(self.model, (batch_x.shape[1], batch_x.shape[2]))
             exit()
 
-        preds, trues, inputx = np.array(preds), np.array(trues), np.array(inputx)
-        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-        trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
-        inputx = inputx.reshape(-1, inputx.shape[-2], inputx.shape[-1])
+        preds, trues = np.array(preds), np.array(trues)
+        df = pd.DataFrame({
+            'dates': date_stamp_datetimes,
+            'trues': trues,
+            f'{self.args.model}_preds': preds,
+
+        })
+
+        # 保存为CSV文件
+        df.to_csv('./result/data_comparison.csv', index=False)
 
         folder_path = os.path.join('./results', setting)
         os.makedirs(folder_path, exist_ok=True)
@@ -235,9 +244,9 @@ class Exp_Main(Exp_Basic):
             f.write('\n')
 
         np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe, rse, corr]))
-        np.save(os.path.join(folder_path, 'pred.npy'), preds)
+        np.save(os.path.join(folder_path, f'{self.args.model}_pred.npy'), preds)
         np.save(os.path.join(folder_path, 'true.npy'), trues)
-        np.save(os.path.join(folder_path, 'x.npy'), inputx)
+
 
     # 预测
     def predict(self, setting, load=False):

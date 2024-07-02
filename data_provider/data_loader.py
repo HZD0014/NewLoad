@@ -275,7 +275,7 @@ class Dataset_Load(Dataset):
         self.data_x = data[border1:border2]  # Exclude target column
         self.data_y = data[:, -1][border1:border2]  # Only target column
         self.data_stamp = data_stamp
-
+        self.target_stamp = df_raw['date'].values[border1:border2]
 
     def __getitem__(self, index):
         s_begin = index
@@ -287,8 +287,8 @@ class Dataset_Load(Dataset):
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
-
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+        target_time = np.array(pd.to_datetime(self.target_stamp[r_begin:r_end]).astype(int) // 10**9)
+        return seq_x, seq_y, seq_x_mark, seq_y_mark, target_time
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1
