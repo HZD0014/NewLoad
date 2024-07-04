@@ -76,8 +76,8 @@ class Backbone(nn.Module):
         self.revin = revin
         if self.revin: self.revin_layer = RevIN(self.nvals, affine=affine, subtract_last=subtract_last)
     def forward(self, x):
-        bs = x.shape[0]
-        nvars = x.shape[-1]
+        bs = x.shape[0]         # batchsize
+        nvars = x.shape[-1]     # n_val / chnnels
         if self.revin:
             x = self.revin_layer(x, 'norm')
         x = x.permute(0, 2, 1)                                                       # x: [batch, n_val, seq_len]

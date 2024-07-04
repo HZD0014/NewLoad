@@ -50,32 +50,6 @@ def dct(x, norm=None):
 
     return V
 
-
-# class senet_block(nn.Module):
-#     def __init__(self, channel=512, ratio=1):
-#         super(dct_channel_block, self).__init__()
-#         self.avg_pool = nn.AdaptiveAvgPool1d(1) #innovation
-#         self.fc = nn.Sequential(
-#                 nn.Linear(channel, channel // 4, bias=False),
-#                 nn.ReLU(inplace=True),
-#                 nn.Linear(channel //4, channel, bias=False),
-#                 nn.Sigmoid()
-#         )
-
-#     def forward(self, x):
-#         # b, c, l = x.size() # (B,C,L)
-#         # y = self.avg_pool(x) # (B,C,L) -> (B,C,1)
-#         # print("y",y.shape)
-#         x = x.permute(0,2,1)
-#         b, c, l = x.size() 
-#         y = self.avg_pool(x).view(b, c) # (B,C,L) ->(B,C,1)
-#         # print("y",y.shape)
-#         # y = self.fc(y).view(b, c, 96)
-
-#         y = self.fc(y).view(b,c,1)
-#         # print("y",y.shape)
-#         # return x * y
-#         return (x*y).permute(0,2,1)
 class dct_channel_block(nn.Module):
     def __init__(self, channel):
         super(dct_channel_block, self).__init__()
@@ -95,26 +69,18 @@ class dct_channel_block(nn.Module):
 
     def forward(self, x):
         b, c, l = x.size() # (B,C,L) (32,96,512)
-        # y = self.avg_pool(x) # (B,C,L) -> (B,C,1)
-        
-        # y = self.avg_pool(x).view(b, c) # (B,C,L) -> (B,C,1)
-        # print("y",y.shape
-        # y = self.fc(y).view(b, c, 96)
+
         list = []
         for i in range(c):
             freq=dct(x[:,i,:])     
-            # print("freq-shape:",freq.shape)
+            print("freq-shape:",freq.shape)
             list.append(freq)
-         
-        
-
         stack_dct=torch.stack(list,dim=1)
-        stack_dct = torch.tensor(stack_dct)
+        stack_dct = stack_dct.clone().detach()  # 创建数据独立的副本
         '''
         for traffic mission:f_weight = self.dct_norm(f_weight.permute(0,2,1))#matters for traffic datasets
         '''
-        
-        lr_weight = self.dct_norm(stack_dct) 
+
         lr_weight = self.fc(stack_dct)
         lr_weight = self.dct_norm(lr_weight) 
         
@@ -124,8 +90,8 @@ class dct_channel_block(nn.Module):
 
 if __name__ == '__main__':
     
-    tensor = torch.rand(8,7,96)
-    dct_model = dct_channel_block()
+    tensor = torch.rand(512,7,96)
+    dct_model = dct_channel_block(96)
     result = dct_model.forward(tensor) 
     print("result.shape:",result.shape)
 

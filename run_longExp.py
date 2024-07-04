@@ -12,7 +12,7 @@ params = {
     'random_seed': 2021,  # 随机种子，确保实验的可重复性
     'is_training': 1,  # 训练状态，1 表示训练模式，0 表示测试模式
     'model_id': 'test',  # 模型的唯一标识符
-    'model': 'DLinear',  # 模型名称
+    'model': 'FreTS',  # 模型名称
     'des': 'test',  # 实验描述
 
     # 数据配置
@@ -117,11 +117,11 @@ def main():
                 args.random_seed, ii)
 
             exp = Exp(args)  # 设置实验
-            # print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
-            # exp.train(setting)
+            print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+            exp.train(setting)
 
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            exp.test(setting, test=1)
+            exp.test(setting, test=0)
 
             if args.do_predict:
                 print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
