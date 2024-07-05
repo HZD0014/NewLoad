@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -97,3 +99,29 @@ class Model(nn.Module):
         x = x + bias
         x = self.fc(x.reshape(B, N, -1)).permute(0, 2, 1)
         return x
+
+
+if __name__ == '__main__':
+    tensor = torch.rand(512, 96, 7)
+    # 假设我们有一个配置字典
+    config_dict = {
+        'task_name': 'time_series_forecasting',
+        'seq_len': 96,
+        'pred_len': 24,
+        'enc_in': 7,
+        'd_model': 64,
+        'patch_len': 10,
+        'stride': 5,
+        'padding': 2,
+        'dropout': 0.1,
+        'dropout1': 0.1,
+        'patch_list': [10, 20],
+        'top_k': 2,
+        'conv_kernel': [3, 5, 7],
+    }
+
+    # 将字典转换为SimpleNameSpace对象
+    configs = SimpleNamespace(**config_dict)
+    model = Model(configs)
+    result = model.forward(tensor)
+    print("result.shape:", result.shape)

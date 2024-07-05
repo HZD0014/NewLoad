@@ -12,7 +12,7 @@ params = {
     'random_seed': 2021,  # 随机种子，确保实验的可重复性
     'is_training': 1,  # 训练状态，1 表示训练模式，0 表示测试模式
     'model_id': 'test',  # 模型的唯一标识符
-    'model': 'FreTS',  # 模型名称
+    'model': 'MPLinear',  # 模型名称
     'des': 'test',  # 实验描述
 
     # 数据配置
@@ -39,7 +39,7 @@ params = {
     'embed_type': 0,  # 嵌入类型
 
     # 模型超参数
-    'enc_in': 32,  # 特征数量
+    'enc_in': 33,  # 特征数量
     'mixer_kernel_size': 8,  # PatchMixer 的卷积核大小
     'd_model': 256,  # 模型维度
     'n_heads': 8,  # 注意力头的数量
@@ -52,8 +52,8 @@ params = {
     # 训练配置
     'checkpoints': './checkpoints/',  # 模型检查点保存位置
     'fc_dropout': 0.05,  # 全连接层的 dropout 率
-    'head_dropout': 0.0,  # 注意力头的 dropout 率
-    'dropout': 0.05,  # dropout 率
+    'head_dropout': 0.,  # 注意力头的 dropout 率
+    'dropout': 0.1,  # dropout 率
     'embed': 'timeF',  # 时间特征编码类型
     'activation': 'gelu',  # 激活函数
     'output_attention': False,  # 是否在编码器中输出注意力
@@ -61,7 +61,7 @@ params = {
     'num_workers': 6,  # 数据加载器的工作线程数
     'itr': 2,  # 实验次数
     'train_epochs': 300,  # 训练周期数
-    'batch_size': 512,  # 训练输入数据的批量大小
+    'batch_size': 128,  # 训练输入数据的批量大小
     'patience': 30,  # 早停法的耐心值
 
     # 优化器配置
@@ -78,7 +78,12 @@ params = {
 
     # 其他配置
     'test_flop': False,  # 是否测试 FLOP
-    'loss_flag': 1  # 损失函数标志
+    'loss_flag': 1 , # 损失函数标志
+
+    'dropout1': 0.2,
+    'patch_list': [16, 24],
+    'top_k': 2,
+    'conv_kernel': [3, 5, 7],
 }
 
 

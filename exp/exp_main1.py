@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS
+from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS, MPLinear
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric, MAE, MSE
 import pandas as pd
@@ -47,7 +47,8 @@ class Exp_Main(Exp_Basic):
             'Linear': Linear,
             'PatchMixer': PatchMixer,
             'FITS': FITS,
-            'FreTS': FreTS
+            'FreTS': FreTS,
+            'MPLinear':MPLinear
         }
         model = model_dict[self.args.model].Model(self.args).float().to(self.device)
         if self.args.use_multi_gpu and self.args.use_gpu:

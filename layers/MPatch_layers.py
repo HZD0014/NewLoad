@@ -58,7 +58,7 @@ class PatchEmbedding(nn.Module):
 
         self.padding_patch_layer = nn.ReplicationPad1d((0, padding))
         self.value_embedding = nn.Linear(d_model, d_model, bias=False)
-
+        self.position_embedding = PositionalEmbedding(d_model)
         # Residual dropout
         self.dropout = nn.Dropout(dropout)
 
@@ -138,9 +138,9 @@ class series_decomp_multi(nn.Module):
 
 
 class PatchBlock(nn.Module):
-    def __init__(self, configs, patch_len=16):
+    def __init__(self, configs, patch_len=10):
         super(PatchBlock, self).__init__()
-
+        self.task_name = configs.task_name
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
         padding = configs.stride
@@ -199,53 +199,3 @@ class PatchBlock(nn.Module):
         trend_output = self.Linear_Trend(trend_init)
         x = seasonal_output + trend_output
         return x.permute(0, 2, 1)
-
-
-class Model(nn.Module):
-    def __init__(self, configs):
-        super().__init__()
-
-        self.seq_len = configs.seq_len
-        self.pred_len = configs.pred_len
-        self.top_k = configs.top_k
-
-        self.model = nn.ModuleList([PatchBlock(configs, patch_len=patch) for patch in configs.patch_list])
-        self.weights = nn.Parameter(torch.ones(self.top_k), requires_grad=True)
-
-    def forward(self, x_enc):
-        x_enc = x_enc.permute(0, 2, 1)
-        res = []
-        for layer in self.model:
-            out = layer(x_enc)
-            res.append(out)
-
-        res = torch.stack(res, dim=-1)
-        res = torch.sum(res * self.weights.view(1, 1, 1, self.top_k), dim=-1)
-
-        return res[:, -self.pred_len:, :]  # [B, L, D]
-
-
-if __name__ == '__main__':
-    tensor = torch.rand(512, 96, 7)
-    # 假设我们有一个配置字典
-    config_dict = {
-        'task_name': 'time_series_forecasting',
-        'seq_len': 96,
-        'pred_len': 24,
-        'enc_in': 7,
-        'd_model': 64,
-        'patch_len': 10,
-        'stride': 5,
-        'padding': 2,
-        'dropout': 0.1,
-        'dropout1': 0.1,
-        'patch_list': [16, 20],
-        'top_k': 2,
-        'conv_kernel': [3, 5, 7],
-    }
-
-    # 将字典转换为SimpleNameSpace对象
-    configs = SimpleNamespace(**config_dict)
-    model = Model(configs)
-    result = model.forward(tensor)
-    print("result.shape:", result.shape)

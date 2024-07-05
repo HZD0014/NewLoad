@@ -1,5 +1,7 @@
 __all__ = ['PatchMixer']
 
+from types import SimpleNamespace
+
 # Cell
 import torch
 from torch import nn
@@ -99,3 +101,32 @@ class Backbone(nn.Module):
         if self.revin:
             x = self.revin_layer(x, 'denorm')
         return x
+
+if __name__ == '__main__':
+    tensor = torch.rand(512, 96, 7)
+    # 假设我们有一个配置字典
+    config_dict = {
+        'task_name': 'time_series_forecasting',
+        'seq_len': 96,
+        'pred_len': 24,
+        'enc_in': 7,
+        'd_model': 256,
+        'patch_len': 16,
+        'stride': 8,
+        'padding': 2,
+        'dropout': 0.1,
+        'dropout1': 0.1,
+        'patch_list': [16, 20],
+        'top_k': 2,
+        'conv_kernel': [3, 5, 7],
+        'mixer_kernel_size' : 5,
+        'head_dropout' : 0.2,
+        'e_layers' : 2
+
+    }
+
+    # 将字典转换为SimpleNameSpace对象
+    configs = SimpleNamespace(**config_dict)
+    model = Model(configs)
+    result = model.forward(tensor)
+    print("result.shape:", result.shape)
