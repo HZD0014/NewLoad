@@ -39,7 +39,7 @@ params = {
     'embed_type': 0,  # 嵌入类型
 
     # 模型超参数
-    'enc_in': 33,  # 特征数量
+    'enc_in': 33,  # 特征数量   Australia : 33
     'mixer_kernel_size': 8,  # PatchMixer 的卷积核大小
     'd_model': 256,  # 模型维度
     'n_heads': 8,  # 注意力头的数量
@@ -81,8 +81,8 @@ params = {
     'loss_flag': 1 , # 损失函数标志
 
     'dropout1': 0.2,
-    'patch_list': [16, 24],
-    'top_k': 2,
+    'patch_list': [12, 24, 48],
+    'top_k': 3,
     'conv_kernel': [3, 5, 7],
 }
 

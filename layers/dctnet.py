@@ -68,7 +68,7 @@ class dct_channel_block(nn.Module):
 
 
     def forward(self, x):
-        b, c, l = x.size() # (B,C,L) (32,96,512)
+        b, c, l = x.size() # (B,C,L) (512,7,96)
 
         list = []
         for i in range(c):

@@ -254,12 +254,6 @@ class Exp_Main(Exp_Basic):
         mspe = np.mean(mspe) if isinstance(mspe, (np.ndarray, list)) else mspe
         rse = np.mean(rse) if isinstance(rse, (np.ndarray, list)) else rse
 
-        print('mse:{}, mae:{}, rse:{}'.format(mse, mae, rse))
-        with open("result.txt", 'a') as f:
-            f.write(f'{setting}\n')
-            f.write('mse:{}, mae:{}, rse:{}\n'.format(mse, mae, rse))
-            f.write('\n')
-
         np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe, rse]))
 
 
