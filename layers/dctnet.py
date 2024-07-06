@@ -58,12 +58,12 @@ class dct_channel_block(nn.Module):
                 nn.Linear(channel, channel*2, bias=False),
                 nn.Dropout(p=0.1),
                 nn.ReLU(inplace=True),
-                nn.Linear( channel*2, channel, bias=False),
+                nn.Linear(channel*2, channel, bias=False),
                 nn.Sigmoid()
         )
         # self.dct_norm = nn.LayerNorm([512], eps=1e-6)
   
-        self.dct_norm = nn.LayerNorm([96], eps=1e-6)#for lstm on length-wise
+        self.dct_norm = nn.LayerNorm([channel], eps=1e-6)#for lstm on length-wise
         # self.dct_norm = nn.LayerNorm([36], eps=1e-6)#for lstm on length-wise on ill with input =36
 
 
@@ -73,7 +73,7 @@ class dct_channel_block(nn.Module):
         list = []
         for i in range(c):
             freq=dct(x[:,i,:])     
-            print("freq-shape:",freq.shape)
+
             list.append(freq)
         stack_dct=torch.stack(list,dim=1)
         stack_dct = stack_dct.clone().detach()  # 创建数据独立的副本
@@ -89,10 +89,10 @@ class dct_channel_block(nn.Module):
 
 
 if __name__ == '__main__':
-    
-    tensor = torch.rand(512,7,96)
+    x = torch.rand(512,96,7)
+    x = x.permute(0,2,1)
     dct_model = dct_channel_block(96)
-    result = dct_model.forward(tensor) 
+    result = dct_model(x)
     print("result.shape:",result.shape)
 
 

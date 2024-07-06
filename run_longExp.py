@@ -7,26 +7,40 @@ from exp.exp_main1 import Exp_Main
 import random
 import numpy as np
 
-params = {
-    # 基础配置
-    'random_seed': 2021,  # 随机种子，确保实验的可重复性
-    'is_training': 1,  # 训练状态，1 表示训练模式，0 表示测试模式
-    'model_id': 'test',  # 模型的唯一标识符
-    'model': 'MPLinear',  # 模型名称
-    'des': 'test',  # 实验描述
-
-    # 数据配置
+Australia_data_dict = {
+# 数据配置
     'dataset': 'Load',  # 数据集类型
     'root_path': './dataset/',  # 数据集文件的根路径
     'data_path': 'AustraliaNew.csv',  # 数据集文件名
     'features': 'MS',  # 预测任务类型
     'target': 'LOAD',  # 目标特征
     'freq': 'h',  # 时间特征编码的频率
-
-    # 模型结构参数
+    'enc_in': 33,  # 特征数量   Australia : 33
+    'seq_len': 192,  # 输入序列长度
+    'label_len': 0,  # 起始标记长度
+    'pred_len': 48,  # 预测序列长度
+}
+Panama_data_dict = {
+# 数据配置
+    'dataset': 'Load',  # 数据集类型
+    'root_path': './dataset/',  # 数据集文件的根路径
+    'data_path': 'PanamaLoad1.csv',  # 数据集文件名
+    'features': 'MS',  # 预测任务类型
+    'target': 'LOAD',  # 目标特征
+    'freq': 'h',  # 时间特征编码的频率
+    'enc_in': 37,  # 特征数量   Australia : 33
     'seq_len': 96,  # 输入序列长度
     'label_len': 0,  # 起始标记长度
     'pred_len': 24,  # 预测序列长度
+}
+params = {
+    # 基础配置
+    'random_seed': 2021,  # 随机种子，确保实验的可重复性
+    'is_training': 1,  # 训练状态，1 表示训练模式，0 表示测试模式
+    'model_id': 'test',  # 模型的唯一标识符
+    'model': 'MPFreTS',  # 模型名称
+    'des': 'test',  # 实验描述
+    # 模型结构参数
     'patch_len': 16,  # 补丁长度
     'stride': 8,  # 步幅
     'padding_patch': 'end',  # 补丁的填充方式
@@ -39,7 +53,7 @@ params = {
     'embed_type': 0,  # 嵌入类型
 
     # 模型超参数
-    'enc_in': 33,  # 特征数量   Australia : 33
+
     'mixer_kernel_size': 8,  # PatchMixer 的卷积核大小
     'd_model': 256,  # 模型维度
     'n_heads': 8,  # 注意力头的数量
@@ -59,7 +73,7 @@ params = {
     'output_attention': False,  # 是否在编码器中输出注意力
     'do_predict': False,  # 是否预测未来数据
     'num_workers': 6,  # 数据加载器的工作线程数
-    'itr': 2,  # 实验次数
+    'itr': 1,  # 实验次数
     'train_epochs': 300,  # 训练周期数
     'batch_size': 128,  # 训练输入数据的批量大小
     'patience': 30,  # 早停法的耐心值
@@ -88,9 +102,9 @@ params = {
 
 
 def main():
-    args = types.SimpleNamespace(**params)
+    args = types.SimpleNamespace(**(params | Australia_data_dict))
     # 设定随机种子
-    fix_seed = args.random_seed
+    fix_seed = 2021
     random.seed(fix_seed)
     torch.manual_seed(fix_seed)
     np.random.seed(fix_seed)

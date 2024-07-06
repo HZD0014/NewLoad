@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS, MPLinear
+from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS, MPLinear, MPFreTS
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric, MAE, MSE
 import pandas as pd
@@ -48,7 +48,8 @@ class Exp_Main(Exp_Basic):
             'PatchMixer': PatchMixer,
             'FITS': FITS,
             'FreTS': FreTS,
-            'MPLinear':MPLinear
+            'MPLinear':MPLinear,
+            'MPFreTS' : MPFreTS
         }
         model = model_dict[self.args.model].Model(self.args).float().to(self.device)
         if self.args.use_multi_gpu and self.args.use_gpu:
@@ -182,7 +183,7 @@ class Exp_Main(Exp_Basic):
 
         preds, trues, date_stamp_datetimes = [], [], []
 
-
+        losss = []
         self.model.eval()
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, date_stamp) in enumerate(test_loader):
@@ -203,7 +204,10 @@ class Exp_Main(Exp_Basic):
                     # 将每一行转换为datetime类型，并添加到列表中
                     t = pd.to_datetime(row, unit='s')
                     date_stamp_datetimes.append(t[0])
+
+
                 pred, true = outputs.detach().cpu().numpy(), batch_y.detach().cpu().numpy()
+                losss.append(self.calculate_metrics(pred, true))
                 preds.extend(pred[:, 0])
                 trues.extend(true[:, 0])
 
@@ -230,11 +234,8 @@ class Exp_Main(Exp_Basic):
         if os.path.isfile(file_name):
             # 如果文件存在，读取CSV文件
             existing_df = pd.read_csv(file_name)
-
-            # 检查新列名是否已存在，如果存在则覆盖
-            if f'{self.args.model}_preds' in existing_df.columns:
-                # 直接用新数据覆盖现有列
-                existing_df[f'{self.args.model}_preds'] = df[f'{self.args.model}_preds']
+            # 直接用新数据覆盖现有列
+            existing_df[f'{self.args.model}_preds'] = df[f'{self.args.model}_preds']
         else:
             # 如果文件不存在，使用初始DataFrame
             existing_df = df
@@ -244,17 +245,24 @@ class Exp_Main(Exp_Basic):
 
         folder_path = os.path.join('./metric_results', setting)
         os.makedirs(folder_path, exist_ok=True)
+        # 将列表转换为NumPy数组以方便计算
+        loss_array = np.array(losss)
 
-        mae, mse, rmse, mape, mspe, rse = metric(preds, trues)
+        # 使用np.mean沿着数组的第一个维度计算每个损失指标的平均值
+        mae, mse, mape = np.mean(loss_array, axis=0)
         # 确保所有指标都是标量
         mae = np.mean(mae) if isinstance(mae, (np.ndarray, list)) else mae
         mse = np.mean(mse) if isinstance(mse, (np.ndarray, list)) else mse
-        rmse = np.mean(rmse) if isinstance(rmse, (np.ndarray, list)) else rmse
         mape = np.mean(mape) if isinstance(mape, (np.ndarray, list)) else mape
-        mspe = np.mean(mspe) if isinstance(mspe, (np.ndarray, list)) else mspe
-        rse = np.mean(rse) if isinstance(rse, (np.ndarray, list)) else rse
 
-        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe, rse]))
+        # 格式化输出测试结果
+        print("Test Performance Metrics:")
+        print(f"  Mean Absolute Error (MAE): {mae}")
+        print(f"  Mean Squared Error (MSE): {mse}")
+
+        print(f"   Mean Absolute Percentage Error (MAPE): {mape}")
+
+        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, mape]))
 
 
 

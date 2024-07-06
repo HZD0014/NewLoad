@@ -1,34 +1,266 @@
+from types import SimpleNamespace
+
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from layers.MPatch_layers import PatchBlock
+from torch import nn
+import math
+from layers.dctnet import dct_channel_block
+from torchsummary import summary
 
-class Model(nn.Module):
-    def __init__(self, configs):
-        super(Model, self).__init__()
-        self.embed_size = 128 #embed_size
-        self.hidden_size = 256 #hidden_size
+# 假设你有一个模型实例叫做 model
+# model = ...
 
-        self.pre_length = configs.pred_len
-        self.feature_size = configs.enc_in #channels
-        self.seq_length = configs.seq_len
-        self.top_k = configs.top_k
+# 定义一个输入张量，形状为 (batch_size, channels, height, width)
+# 这里的尺寸需要与模型的输入尺寸匹配
+input_size = (1, 3, 224, 224)  # 例如，对于一
+class PositionalEmbedding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEmbedding, self).__init__()
+        # Compute the positional encodings once in log space.
+        pe = torch.zeros(max_len, d_model).float()
+        pe.require_grad = False
 
-        self.model = nn.ModuleList([PatchBlock(configs, patch_len=patch) for patch in configs.patch_list])
+        position = torch.arange(0, max_len).float().unsqueeze(1)
+        div_term = (torch.arange(0, d_model, 2).float()
+                    * -(math.log(10000.0) / d_model)).exp()
 
-        self.fc = nn.Sequential(
-            nn.Linear(self.seq_length * self.embed_size, self.hidden_size),
-            nn.LeakyReLU(),
-            nn.Linear(self.hidden_size, self.pre_length)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        return self.pe[:, :x.size(1)]
+
+
+class PatchEmbedding(nn.Module):
+    def __init__(self, configs, patch_num, c_in, d_model, patch_len, stride, padding, dropout):
+        super(PatchEmbedding, self).__init__()
+        # Patching
+        self.patch_len = patch_len
+        self.stride = stride
+        self.d_model = d_model
+
+        # MLP_Time
+        self.MLP_Time = nn.Sequential(
+            nn.BatchNorm1d(c_in),
+            nn.Linear(patch_len, patch_len),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(patch_len, patch_len),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(dropout)
+        )
+
+        self.dct_block = dct_channel_block(patch_len)
+
+        # MLP_Feature
+        self.MLP_Feature = nn.Sequential(
+            nn.BatchNorm1d(patch_len),
+            nn.Linear(c_in, c_in),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(c_in, c_in),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(dropout)
+        )
+
+        self.padding_patch_layer = nn.ReplicationPad1d((0, padding))
+        self.value_embedding = nn.Linear(d_model, d_model, bias=False)
+
+        # Residual dropout
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # do patching
+        B = x.shape[0]
+        n_vars = x.shape[1]
+        x = self.padding_patch_layer(x)
+        x = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
+        x = x.permute(0, 2, 3, 1)
+        patch_num = x.shape[1]
+        x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
+        x = x.permute(0, 2, 1)  # b*patch_num x C x patch_len
+        x = x + self.MLP_Time(x)
+
+        x = x + self.dct_block(x)
+
+        x = torch.reshape(x, (B, patch_num, -1))
+        return x, n_vars
+
+
+class moving_avg(nn.Module):
+    """
+    Moving average block to highlight the trend of time series
+    """
+
+    def __init__(self, kernel_size, stride):
+        super(moving_avg, self).__init__()
+        self.kernel_size = kernel_size
+        self.avg = nn.AvgPool1d(kernel_size=kernel_size, stride=stride, padding=0)
+
+    def forward(self, x):
+        # padding on the both ends of time series
+        front = x[:, 0:1, :].repeat(1, (self.kernel_size - 1) // 2, 1)
+        end = x[:, -1:, :].repeat(1, (self.kernel_size - 1) // 2, 1)
+        x = torch.cat([front, x, end], dim=1)
+        x = self.avg(x.permute(0, 2, 1))
+        x = x.permute(0, 2, 1)
+        return x
+
+
+class series_decomp(nn.Module):
+    """
+    Series decomposition block
+    """
+
+    def __init__(self, kernel_size):
+        super(series_decomp, self).__init__()
+        self.moving_avg = moving_avg(kernel_size, stride=1)
+
+    def forward(self, x):
+        moving_mean = self.moving_avg(x)
+        res = x - moving_mean
+        return res, moving_mean
+
+
+class series_decomp_multi(nn.Module):
+    """
+    Multiple Series decomposition block from FEDformer
+    """
+
+    def __init__(self, kernel_size):
+        super(series_decomp_multi, self).__init__()
+        self.kernel_size = kernel_size
+        self.series_decomp = [series_decomp(kernel) for kernel in kernel_size]
+
+    def forward(self, x):
+        moving_mean = []
+        res = []
+        for func in self.series_decomp:
+            sea, moving_avg = func(x)
+            moving_mean.append(moving_avg)
+            res.append(sea)
+
+        sea = sum(res) / len(res)
+        moving_mean = sum(moving_mean) / len(moving_mean)
+        return sea, moving_mean
+
+
+class PatchBlock(nn.Module):
+    def __init__(self, configs, patch_len=16):
+        super(PatchBlock, self).__init__()
+
+        self.seq_len = configs.seq_len
+        self.pred_len = configs.pred_len
+        padding = configs.stride
+
+        self.patch_num = int((configs.seq_len - patch_len) / configs.stride + 2)
+        self.patch_embedding = PatchEmbedding(configs, self.patch_num, configs.enc_in,
+                                              configs.d_model, patch_len, configs.stride, padding, configs.dropout)
+        decomp_kernel = []  # kernel of decomposition operation
+        for ii in configs.conv_kernel:
+            if ii % 2 == 0:  # the kernel of decomposition operation must be odd
+                decomp_kernel.append(ii + 1)
+            else:
+                decomp_kernel.append(ii)
+        self.decomp_multi = series_decomp_multi(decomp_kernel)
+        self.Linear_Seasonal = nn.Sequential(
+            nn.Linear(self.patch_num, self.patch_num)
+        )
+
+        self.Linear_Trend = nn.Sequential(
+            nn.Linear(self.patch_num, self.patch_num)
+        )
+
+        self.Linear_Seasonal.weight = nn.Parameter(
+            (1 / self.patch_num) * torch.ones([self.patch_num, self.patch_num]))
+
+        self.Linear_Trend.weight = nn.Parameter(
+            (1 / self.patch_num) * torch.ones([self.patch_num, self.patch_num]))
+
+        # MLP
+        self.MLP_Seq = nn.Sequential(
+            nn.Linear(self.patch_num * patch_len, configs.d_model),
+            nn.Linear(configs.d_model, configs.d_model),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(configs.dropout1),
+            nn.Linear(configs.d_model, configs.d_model),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(configs.dropout1),
+            nn.Linear(configs.d_model, self.pred_len)
         )
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)      # [B,L,C] → [B,C,L]
+        enc_out, n_vars = self.patch_embedding(x)
+        enc_out = self.encoder(enc_out)
+        enc_out = torch.reshape(enc_out, (enc_out.shape[0], -1, n_vars))  # bxpatch_num*patch_len*c
+        enc_out = enc_out.permute(0, 2, 1)
+        dec_out = self.MLP_Seq(enc_out)
+        dec_out = dec_out.permute(0, 2, 1)
+        return dec_out
+
+    def encoder(self, x):
+        seasonal_init, trend_init = self.decomp_multi(x)
+        seasonal_init, trend_init = seasonal_init.permute(
+            0, 2, 1), trend_init.permute(0, 2, 1)
+
+        seasonal_output = self.Linear_Seasonal(seasonal_init)
+        trend_output = self.Linear_Trend(trend_init)
+        x = seasonal_output + trend_output
+        return x.permute(0, 2, 1)
+
+
+class Model(nn.Module):
+    def __init__(self, configs):
+        super().__init__()
+
+        self.seq_len = configs.seq_len
+        self.pred_len = configs.pred_len
+        self.top_k = configs.top_k
+
+        self.model = nn.ModuleList([PatchBlock(configs, patch_len=patch) for patch in configs.patch_list])
+        self.weights = nn.Parameter(torch.ones(self.top_k), requires_grad=True)
+
+    def forward(self, x_enc):
+        x_enc = x_enc.permute(0, 2, 1)
         res = []
         for layer in self.model:
-            out = layer(x)
+            out = layer(x_enc)
             res.append(out)
 
+        res = torch.stack(res, dim=-1)
+        res = torch.sum(res * self.weights.view(1, 1, 1, self.top_k), dim=-1)
 
-        return x
+        return res[:, -self.pred_len:, :]  # [B, L, D]
+
+
+if __name__ == '__main__':
+    tensor = torch.rand(512, 96, 7)
+    # 假设我们有一个配置字典
+    config_dict = {
+        'task_name': 'time_series_forecasting',
+        'seq_len': 96,
+        'pred_len': 24,
+        'enc_in': 7,
+        'd_model': 64,
+        'patch_len': 10,
+        'stride': 5,
+        'padding': 2,
+        'dropout': 0.1,
+        'dropout1': 0.1,
+        'patch_list': [16, 20],
+        'top_k': 2,
+        'conv_kernel': [3, 5, 7],
+    }
+
+    # 将字典转换为SimpleNameSpace对象
+    configs = SimpleNamespace(**config_dict)
+    model = Model(configs)
+    # 定义一个输入张量，形状为 (batch_size, channel, sequence_length)
+    input_size = (96, 7)  # 例如，对于你的 dct_channel_block
+
+    # 使用 summary 函数打印模型结构
+    summary(model, input_size)
+    # result = model.forward(tensor)
+    # print("result.shape:", result.shape)

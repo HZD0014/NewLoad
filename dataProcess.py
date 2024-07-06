@@ -1,18 +1,20 @@
 import pandas as pd
 
 # 加载CSV文件
-df = pd.read_csv('./dataset/AustraliaRaw.csv')
+df = pd.read_csv('./dataset/PanamaLoad.csv')
 
-# 转换日期列为datetime类型，并与HOUR列合并
-df['date'] = pd.to_datetime(df['date'], format='%m/%d/%Y')
 
-# 确保HOUR列是整数类型，然后乘以60（因为是半天）
-df['hour'] = df['hour'].astype(float) * 60
+# 假设第一列的列名是'date_time'
+date_time_column = 'date'
 
-# 将日期和小时组合成一个新的datetime列
-df['date'] = df['date'] + pd.to_timedelta(df['hour'], unit='m')
-# 确保datetime列是datetime类型
-df['date'] = pd.to_datetime(df['date'])
+# 转换时间格式，确保时间列是datetime类型
+df[date_time_column] = pd.to_datetime(df[date_time_column], format='%Y/%m/%d %H:%M')
 
-# 保存到新的CSV文件中，或者覆盖源文件
-df.to_csv('./dataset/AustraliaNew.csv', index=False)
+# 计算小时数并转换为分钟
+df['hour'] = df[date_time_column].dt.hour * 60 + df[date_time_column].dt.minute
+
+# 显示结果
+print(df)
+
+# 将结果保存到新的CSV文件
+df.to_csv('./dataset/PanamaLoad1.csv', index=False)
