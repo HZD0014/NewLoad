@@ -51,8 +51,8 @@ class PatchEmbedding(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.Dropout(dropout)
         )
-
-        self.dct_block = dct_channel_block(patch_len)
+        if configs.use_dct:
+            self.dct_block = dct_channel_block(patch_len)
 
         # MLP_Feature
         self.MLP_Feature = nn.Sequential(
@@ -82,8 +82,8 @@ class PatchEmbedding(nn.Module):
         x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
         x = x.permute(0, 2, 1)  # b*patch_num x C x patch_len
         x = x + self.MLP_Time(x)
-
-        x = x + self.dct_block(x)
+        if hasattr(self, 'dct_block'):
+            x = x + self.dct_block(x)
 
         x = torch.reshape(x, (B, patch_num, -1))
         return x, n_vars

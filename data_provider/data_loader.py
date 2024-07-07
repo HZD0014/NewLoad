@@ -129,7 +129,7 @@ class Dataset_ETT_minute(Dataset):
         self.__read_data__()
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
+        self.scaler = MinMaxScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
 
@@ -237,8 +237,8 @@ class Dataset_Load(Dataset):
         cols.remove('date')
         df_raw = df_raw[['date'] + cols + [self.target]]
         # print(cols)
-        num_train = int(len(df_raw) * 0.8)
-        num_test = int(len(df_raw) * 0.1)
+        num_train = int(len(df_raw) * 0.6)
+        num_test = int(len(df_raw) * 0.2)
         num_vali = len(df_raw) - num_train - num_test
         border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
         border2s = [num_train, num_train + num_vali, len(df_raw)]
@@ -255,7 +255,7 @@ class Dataset_Load(Dataset):
             df_data = df_raw[cols_data]
 
         if self.scale:
-            self.scaler = StandardScaler()
+            self.scaler = MinMaxScaler()
             data = self.scaler.fit_transform(df_data.values)
         else:
             data = df_raw.drop(columns=['date']).values

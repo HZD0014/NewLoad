@@ -48,8 +48,8 @@ class Exp_Main(Exp_Basic):
             'PatchMixer': PatchMixer,
             'FITS': FITS,
             'FreTS': FreTS,
-            'MPLinear':MPLinear,
-            'MPFreTS' : MPFreTS
+            'MPLinear': MPLinear,
+            'MPFreTS': MPFreTS
         }
         model = model_dict[self.args.model].Model(self.args).float().to(self.device)
         if self.args.use_multi_gpu and self.args.use_gpu:
