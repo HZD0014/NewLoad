@@ -1,13 +1,13 @@
 from torch import nn
 
 
-class LSTMModel(nn.Module):
+class Model(nn.Module):
     def __init__(self, configs):
-        super(LSTMModel, self).__init__()
+        super(Model, self).__init__()
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
-        self.input_dim = configs.input_dim  # 假设在configs中有定义
-        self.hidden_dim = configs.hidden_dim  # 假设在configs中有定义
+        self.input_dim = configs.enc_in  # 假设在configs中有定义
+        self.hidden_dim = configs.d_model  # 假设在configs中有定义
         self.num_layers = configs.num_layers  # 假设在configs中有定义
 
         self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, batch_first=True)

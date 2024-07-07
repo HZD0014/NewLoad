@@ -59,13 +59,14 @@ model_params = {
     'patch_list': [12, 24, 48],
     'top_k': 3,
     'conv_kernel': [3, 5, 7],
+    'num_layers' : 2,
 }
 
 params = {
     'random_seed': 2021,
     'is_training': 1,
     'model_id': 'test',
-    'model': 'MPFreTS',
+    'model': 'LSTM',
     'des': 'test',
     'checkpoints': './checkpoints/',
     'fc_dropout': 0.05,

@@ -25,11 +25,27 @@ def RMSE(pred, true):
 
 
 def MAPE(pred, true):
-    return np.mean(np.abs((pred - true) / true))
+    return np.mean(np.abs((pred - true) / true + 1e-8))
 
 
 def MSPE(pred, true):
     return np.mean(np.square((pred - true) / true))
+
+
+def R2(pred, true):
+    # 计算平均值
+    mean_true = np.mean(true)
+
+    # 计算总平方和 SST
+    SST = np.sum((true - mean_true) ** 2)
+
+    # 计算回归平方和 SSR
+    SSR = np.sum((pred - true) ** 2)
+
+    # 计算 R²
+    R2_score = 1 - (SSR / SST)
+
+    return R2_score
 
 
 def metric(pred, true):
@@ -39,6 +55,6 @@ def metric(pred, true):
     mape = MAPE(pred, true)
     mspe = MSPE(pred, true)
     rse = RSE(pred, true)
+    r2 = R2(pred, true)
 
-
-    return mae, mse, rmse, mape, mspe, rse
+    return mae, rmse, r2

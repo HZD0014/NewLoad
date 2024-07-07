@@ -1,8 +1,8 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS, MPLinear, MPFreTS
+from models import DLinear, Linear, NLinear, PatchMixer, FITS, FreTS, MPLinear, MPFreTS, LSTM
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
-from utils.metrics import metric, MAE, MSE
+from utils.metrics import metric, MAE, MSE, MAPE, RMSE
 import pandas as pd
 import numpy as np
 import torch
@@ -49,7 +49,8 @@ class Exp_Main(Exp_Basic):
             'FITS': FITS,
             'FreTS': FreTS,
             'MPLinear': MPLinear,
-            'MPFreTS': MPFreTS
+            'MPFreTS': MPFreTS,
+            'LSTM' : LSTM
         }
         model = model_dict[self.args.model].Model(self.args).float().to(self.device)
         if self.args.use_multi_gpu and self.args.use_gpu:
@@ -77,11 +78,7 @@ class Exp_Main(Exp_Basic):
             return nn.MSELoss()
 
     # 计算指标
-    def calculate_metrics(self, preds, trues):
-        mae = MAE(preds, trues)
-        mse = MSE(preds, trues)
-        mape = np.mean(np.abs((trues - preds) / trues + 1e-8)) * 100
-        return mae, mse, mape
+
 
     # 验证模型
     def vali(self, vali_data, vali_loader, criterion):
@@ -108,9 +105,9 @@ class Exp_Main(Exp_Basic):
 
         total_loss = np.average(total_loss)
         preds, trues = np.concatenate(preds), np.concatenate(trues)
-        mae, mse, mape = self.calculate_metrics(preds, trues)
+        mae, rmse, r2 = metric(preds, trues)
         self.model.train()
-        return total_loss, mae, mse, mape
+        return total_loss, mae, rmse, r2
 
     # 训练模型
     def train(self, setting):
@@ -128,9 +125,9 @@ class Exp_Main(Exp_Basic):
                                             pct_start=self.args.pct_start,
                                             epochs=self.args.train_epochs,
                                             max_lr=self.args.learning_rate)
-
+        train_loss = []
         for epoch in range(self.args.train_epochs):  # 修改epoch数目以适应实验
-            train_loss = []
+            epoch_loss = []
             preds, trues = [], []
             self.model.train()
             epoch_time = time.time()
@@ -148,22 +145,22 @@ class Exp_Main(Exp_Basic):
                     batch_y = batch_y[:, -self.args.pred_len:].to(self.device, non_blocking=True)
 
                 loss = criterion(outputs, batch_y)
-                train_loss.append(loss.item())
+                epoch_loss.append(loss.item())
                 loss.backward()
                 model_optim.step()
-                scheduler.step()
+
 
                 preds.append(outputs.detach().cpu().numpy())
                 trues.append(batch_y.detach().cpu().numpy())
-
+            scheduler.step()
             print("Epoch: {} 耗时: {}".format(epoch + 1, time.time() - epoch_time))
-            train_loss = np.average(train_loss)
+            epoch_loss = np.average(epoch_loss)
             preds, trues = np.concatenate(preds), np.concatenate(trues)
-            train_mae, train_mse, train_mape = self.calculate_metrics(preds, trues)
-            vali_loss, vali_mae, vali_mse, vali_mape = self.vali(vali_data, vali_loader, criterion)
-            print(f"Epoch: {epoch + 1}, | 训练损失: {train_loss:.7f}, 验证损失: {vali_loss:.7f}")
-            print(f"训练集: MAE: {train_mae:.7f}, MSE: {train_mse:.7f}, MAPE: {train_mape:.7f}%")
-            print(f"验证集: MAE: {vali_mae:.7f}, MSE: {vali_mse:.7f}, MAPE: {vali_mape:.7f}%")
+            train_mae, train_rmse, train_r2 = metric(preds, trues)
+            vali_loss, vali_mae, vali_rmse, vali_r2 = self.vali(vali_data, vali_loader, criterion)
+            print(f"Epoch: {epoch + 1}, | 训练损失: {epoch_loss:.7f}, 验证损失: {vali_loss:.7f}")
+            print(f"训练集: MAE: {train_mae:.7f}, RMSE: {train_rmse:.7f}, R2: {train_r2:.7f}%")
+            print(f"验证集: MAE: {vali_mae:.7f}, RMSE: {vali_rmse:.7f}, R2: {vali_r2:.7f}%")
 
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
@@ -207,7 +204,7 @@ class Exp_Main(Exp_Basic):
 
 
                 pred, true = outputs.detach().cpu().numpy(), batch_y.detach().cpu().numpy()
-                losss.append(self.calculate_metrics(pred, true))
+                losss.append(metric(pred, true))
                 preds.extend(pred[:, 0])
                 trues.extend(true[:, 0])
 
@@ -249,20 +246,20 @@ class Exp_Main(Exp_Basic):
         loss_array = np.array(losss)
 
         # 使用np.mean沿着数组的第一个维度计算每个损失指标的平均值
-        mae, mse, mape = np.mean(loss_array, axis=0)
+        mae, rmse, r2 = np.mean(loss_array, axis=0)
         # 确保所有指标都是标量
         mae = np.mean(mae) if isinstance(mae, (np.ndarray, list)) else mae
-        mse = np.mean(mse) if isinstance(mse, (np.ndarray, list)) else mse
-        mape = np.mean(mape) if isinstance(mape, (np.ndarray, list)) else mape
+        rmse = np.mean(rmse) if isinstance(rmse, (np.ndarray, list)) else rmse
+        r2 = np.mean(r2) if isinstance(r2, (np.ndarray, list)) else r2
 
         # 格式化输出测试结果
         print("Test Performance Metrics:")
         print(f"  Mean Absolute Error (MAE): {mae}")
-        print(f"  Mean Squared Error (MSE): {mse}")
+        print(f"  Mean Squared Error (RMSE): {rmse}")
 
-        print(f"   Mean Absolute Percentage Error (MAPE): {mape}")
+        print(f"   Mean Absolute Percentage Error (R2): {r2}")
 
-        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, mape]))
+        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, rmse, r2]))
 
 
 

@@ -1,9 +1,9 @@
 from torch import nn
 
 
-class CNNLSTM(nn.Module):
+class Model(nn.Module):
     def __init__(self, configs):
-        super(CNNLSTM, self).__init__()
+        super(Model, self).__init__()
         # 从配置中获取模型参数
         self.input_channel = configs.input_channel  # 输入通道数
         self.output_channel = configs.output_channel  # 输出通道数
